@@ -1,77 +1,79 @@
-# metadata-compliance-dashboard
+# Metadata Compliance Dashboard
 
-## Summary
+An SPFx web part that scans a SharePoint document library and shows how well it's actually tagged. It reports the percentage of items with complete metadata, breaks down which fields are missing most often, and lets you filter by content type. Built with React, TypeScript, and PnPjs.
 
-Short summary on functionality and used technologies.
+![Dashboard showing 68% completion, at risk status](screenshots/dashboard-at-risk.png)
 
-[picture of the solution in action, if possible]
+## Why this exists
 
-## Used SharePoint Framework Version
+Most SharePoint document libraries look organized on the surface but have inconsistent metadata underneath: missing owners, blank review dates, documents with no classification. That gap is invisible until someone actually needs to search, report on, or migrate that content, and by then it's a much bigger cleanup job.
 
-![version](https://img.shields.io/badge/version-1.23.2-green.svg)
+This project grew out of real migration work managing a 740,000+ file SharePoint migration where metadata tagging accuracy was tracked as a hard requirement (96% on one 36,000+ file migration). A dashboard like this is the kind of tool that would have made that tracking visible in real time instead of after the fact, via a spreadsheet export.
 
-## Applies to
+## What it does
 
-- [SharePoint Framework](https://aka.ms/spfx)
-- [Microsoft 365 tenant](https://docs.microsoft.com/sharepoint/dev/spfx/set-up-your-developer-tenant)
+- Scans a document library and calculates what percentage of items have every required metadata field filled in
+- Automatically discovers a library's custom metadata columns instead of assuming a fixed schema, so it works across libraries with completely different fields
+- Skips libraries that have no custom metadata to evaluate, rather than erroring out
+- Breaks down exactly which fields are causing the most gaps
+- Filters by a content-type-style column when the library has one
+- Color-codes the result (on target / needs attention / at risk) against configurable thresholds
+- Adapts to light and dark SharePoint site themes automatically
 
-> Get your own free development tenant by subscribing to [Microsoft 365 developer program](http://aka.ms/o365devprogram)
+![Dashboard with a document type filter applied](screenshots/dashboard-filtered.png)
 
-## Prerequisites
+![Dashboard showing a fully tagged library at 92%](screenshots/dashboard-on-target.png)
 
-> Any special pre-requisites?
+## Configuration
 
-## Solution
+The web part's property pane lets a site owner adjust it per instance without touching code:
 
-| Solution    | Author(s)                                               |
-| ----------- | ------------------------------------------------------- |
-| folder name | Author details (name, company, twitter alias with link) |
+- Lock the dashboard to a specific library, or leave it open so users can switch between any library that has custom metadata
+- Exclude specific fields from the completeness calculation (useful for optional fields like internal notes)
+- Set custom thresholds for what counts as "on target" versus "at risk"
 
-## Version history
+![Web part property pane showing configuration options](screenshots/property-pane.png)
 
-| Version | Date             | Comments        |
-| ------- | ---------------- | --------------- |
-| 1.1     | March 10, 2021   | Update comment  |
-| 1.0     | January 29, 2021 | Initial release |
+![Dashboard in light theme](screenshots/dashboard-light-mode.png)
 
-## Disclaimer
+## How it's built
 
-**THIS CODE IS PROVIDED _AS IS_ WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.**
+- **SPFx 1.23** web part, React function components with hooks
+- **PnPjs** for all SharePoint REST calls (no raw fetch, no hand-built OData strings)
+- **TypeScript** throughout, strict interfaces for every SharePoint response shape
+- Custom SVG progress ring, no charting library dependency
+- SCSS driven by CSS custom properties, so the same styles adapt automatically to a site's real color theme via `onThemeChanged`
+- Zero external font or asset dependencies, everything ships inside the compiled bundle
 
----
+### How the library discovery works
 
-## Minimal Path to Awesome
+On load, the web part queries every document library on the site, checks each one's field schema, and filters out SharePoint's own system columns (things like Created, Modified, Content Type) using a combination of naming convention and field metadata. Whatever custom columns are left become the metadata the dashboard evaluates. A library with no custom columns is skipped from the picker instead of showing an error.
 
-- Clone this repository
-- Ensure that you are at the solution folder
-- in the command-line run:
-  - `npm install -g @rushstack/heft`
-  - `npm install`
-  - `heft start`
+## Known limitations
 
-> Include any additional steps as needed.
+- Item scanning is capped per library (SharePoint's REST API has practical limits on how many items come back in a single call). True paging for very large libraries is on the roadmap, not yet built.
+- Per-instance color and font customization was attempted but pulled before shipping after it caused an intermittent SPFx load failure tied to applying styles during the web part's render cycle. The data-focused configuration options (library lock, thresholds, excluded fields) all work correctly. This is a good candidate for a follow-up fix using a safer styling approach.
+- No cross-site aggregation. Each instance reports on libraries within the site it's deployed to. A tenant-wide rollup across multiple sites is a reasonable next step but would need Microsoft Graph with broader permissions, which is a real conversation to have with a tenant admin before building, especially in a DoD or GCC High environment.
 
-Other build commands can be listed using `heft --help`.
+## Deployment notes for DoD / GCC High environments
 
-## Features
+- All data calls go through SharePoint's own REST API via PnPjs. There are no calls to Microsoft Graph, no external APIs, and no third-party CDN dependencies in the shipped bundle, which matters in tenants that block outbound calls to unapproved domains.
+- Deploys cleanly through a site collection app catalog, so it doesn't require a tenant-wide admin approval to pilot on a single site.
+- No premium connectors, no Dataverse, no custom connector usage, so it doesn't run into the DLP policies that commonly block Power Platform automation in restricted tenants.
 
-Description of the extension that expands upon high-level summary above.
+## Local development
 
-This extension illustrates the following concepts:
+```
+npm install
+npm run start
+```
 
-- topic 1
-- topic 2
-- topic 3
+Requires Node 22.x. Opens the SharePoint hosted workbench for local debugging against a real tenant (SPFx removed local-only workbench support in newer versions).
 
-> Notice that better pictures and documentation will increase the sample usage and the value you are providing for others. Thanks for your submissions advance.
+To package for deployment:
 
-> Share your web part with others through Microsoft 365 Patterns and Practices program to get visibility and exposure. More details on the community, open-source projects and other activities from http://aka.ms/m365pnp.
+```
+npm run build
+```
 
-## References
-
-- [Getting started with SharePoint Framework](https://docs.microsoft.com/sharepoint/dev/spfx/set-up-your-developer-tenant)
-- [Building for Microsoft teams](https://docs.microsoft.com/sharepoint/dev/spfx/build-for-teams-overview)
-- [Use Microsoft Graph in your solution](https://docs.microsoft.com/sharepoint/dev/spfx/web-parts/get-started/using-microsoft-graph-apis)
-- [Publish SharePoint Framework applications to the Marketplace](https://docs.microsoft.com/sharepoint/dev/spfx/publish-to-marketplace-overview)
-- [Microsoft 365 Patterns and Practices](https://aka.ms/m365pnp) - Guidance, tooling, samples and open-source controls for your Microsoft 365 development
-- [Heft Documentation](https://heft.rushstack.io/)
+This produces a `.sppkg` file in `sharepoint/solution`, ready to upload to a SharePoint app catalog.
