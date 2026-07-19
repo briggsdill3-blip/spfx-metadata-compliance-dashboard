@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "metadata-compliance-dashboard-client-side-solution",
+    "id": "d9bf266e-c59d-4989-985f-55bc155868b5",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.23.2"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "metadata-compliance-dashboard description"
+      },
+      "longDescription": {
+        "default": "metadata-compliance-dashboard description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "metadata-compliance-dashboard Feature",
+        "description": "The feature that activates elements of the metadata-compliance-dashboard solution.",
+        "id": "caca5f12-9077-4408-90b5-989bd97bb653",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/metadata-compliance-dashboard.sppkg"
+  }
+}

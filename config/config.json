@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "metadata-compliance-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/metadataCompliance/MetadataComplianceWebPart.js",
+          "manifest": "./src/webparts/metadataCompliance/MetadataComplianceWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "MetadataComplianceWebPartStrings": "lib/webparts/metadataCompliance/loc/{locale}.js"
+  }
+}

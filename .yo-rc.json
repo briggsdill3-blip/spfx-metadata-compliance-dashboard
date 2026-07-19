@@ -1,0 +1,19 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "useGulp": false,
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "22.14.0",
+    "sdksVersions": {},
+    "version": "1.23.2",
+    "libraryName": "metadata-compliance-dashboard",
+    "libraryId": "d9bf266e-c59d-4989-985f-55bc155868b5",
+    "environment": "spo",
+    "packageManager": "npm",
+    "solutionName": "metadata-compliance-dashboard",
+    "solutionShortDescription": "metadata-compliance-dashboard description",
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "componentType": "webpart"
+  }
+}
