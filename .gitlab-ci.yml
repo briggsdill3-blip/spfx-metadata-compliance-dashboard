@@ -1,0 +1,9 @@
+build-sppkg:
+  image: node:22
+  script:
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - sharepoint/solution/*.sppkg
+    expire_in: 30 days
