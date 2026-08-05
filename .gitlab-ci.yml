@@ -7,3 +7,14 @@ build-sppkg:
     paths:
       - sharepoint/solution/*.sppkg
     expire_in: 30 days
+
+lint-eslint:
+  image: node:22
+  script:
+    - npm install
+    - npx eslint . --format json --output-file eslint-report.json
+    - npx eslint .
+  artifacts:
+    paths:
+      - eslint-report.json
+    when: always
