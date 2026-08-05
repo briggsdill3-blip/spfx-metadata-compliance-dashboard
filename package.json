@@ -31,6 +31,7 @@
     "@microsoft/sp-module-interfaces": "1.23.2",
     "@microsoft/spfx-heft-plugins": "1.23.2",
     "@microsoft/spfx-web-build-rig": "1.23.2",
+    "eslint-plugin-sonarjs": "^1.0.3",
     "@rushstack/heft": "1.2.17",
     "@types/jest": "30.0.0",
     "@types/react": "17.0.45",
