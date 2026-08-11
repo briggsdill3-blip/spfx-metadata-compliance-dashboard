@@ -19,7 +19,6 @@ import MetadataCompliance from './components/MetadataCompliance';
 import { IMetadataComplianceProps } from './components/IMetadataComplianceProps';
 
 export interface IMetadataComplianceWebPartProps {
-  description: string;
   lockedLibrary: string;
   goodThreshold: string;
   warnThreshold: string;
@@ -43,16 +42,19 @@ const parseExcludedFields = (raw: string): string[] => {
 
 export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMetadataComplianceWebPartProps> {
 
-  private _isDarkTheme: boolean = false;
+  private _theme: IReadonlyTheme | undefined;
   private _environmentMessage: string = '';
   private _sp!: SPFI;
 
   public render(): void {
+    if (!this._sp) {
+      return;
+    }
+
     const element: React.ReactElement<IMetadataComplianceProps> = React.createElement(
       MetadataCompliance,
       {
-        description: this.properties.description,
-        isDarkTheme: this._isDarkTheme,
+        theme: this._theme,
         environmentMessage: this._environmentMessage,
         userDisplayName: this.context.pageContext.user.displayName,
         sp: this._sp,
@@ -74,8 +76,6 @@ export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMe
     });
   }
 
-
-
   private _getEnvironmentMessage(): Promise<string> {
     if (!!this.context.sdks.microsoftTeams) {
       return this.context.sdks.microsoftTeams.teamsJs.app.getContext()
@@ -95,40 +95,18 @@ export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMe
             default:
               environmentMessage = strings.UnknownEnvironment;
           }
-
           return environmentMessage;
         });
     }
-
     return Promise.resolve(this.context.isServedFromLocalhost ? strings.AppLocalEnvironmentSharePoint : strings.AppSharePointEnvironment);
   }
 
   protected onThemeChanged(currentTheme: IReadonlyTheme | undefined): void {
-    if (!currentTheme || !this.domElement) {
+    if (!currentTheme) {
       return;
     }
-
-    this._isDarkTheme = !!currentTheme.isInverted;
-
-    const { semanticColors, palette } = currentTheme;
-
-    if (semanticColors) {
-      this.domElement.style.setProperty('--bodyText', semanticColors.bodyText || null);
-      this.domElement.style.setProperty('--link', semanticColors.link || null);
-      this.domElement.style.setProperty('--linkHovered', semanticColors.linkHovered || null);
-
-      this.domElement.style.setProperty('--mcd-page-bg', semanticColors.bodyBackground || null);
-      this.domElement.style.setProperty('--mcd-card-bg', semanticColors.cardStandoutBackground || semanticColors.bodyBackground || null);
-      this.domElement.style.setProperty('--mcd-text', semanticColors.bodyText || null);
-      this.domElement.style.setProperty('--mcd-text-secondary', semanticColors.bodySubtext || null);
-      this.domElement.style.setProperty('--mcd-border', semanticColors.bodyDivider || null);
-    }
-
-    if (palette) {
-      this.domElement.style.setProperty('--mcd-accent', palette.themePrimary || null);
-      this.domElement.style.setProperty('--mcd-accent-dark', palette.themeDarkAlt || null);
-      this.domElement.style.setProperty('--mcd-accent-light', palette.themeLighter || null);
-    }
+    this._theme = currentTheme;
+    this.render();
   }
 
   protected onDispose(): void {
@@ -150,9 +128,6 @@ export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMe
             {
               groupName: strings.BasicGroupName,
               groupFields: [
-                PropertyPaneTextField('description', {
-                  label: strings.DescriptionFieldLabel
-                }),
                 PropertyPaneTextField('lockedLibrary', {
                   label: 'Lock to Library (exact name)',
                   description: 'Leave blank to let users switch between any qualifying library on this site.'

@@ -1,8 +1,8 @@
 import { SPFI } from '@pnp/sp';
+import { IReadonlyTheme } from '@microsoft/sp-component-base';
 
 export interface IMetadataComplianceProps {
-  description: string;
-  isDarkTheme: boolean;
+  theme: IReadonlyTheme | undefined;
   environmentMessage: string;
   userDisplayName: string;
   sp: SPFI;

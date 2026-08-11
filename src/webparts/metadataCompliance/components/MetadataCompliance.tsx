@@ -72,8 +72,8 @@ const ProgressRing: React.FunctionComponent<IProgressRingProps> = ({ percent, ti
     return () => cancelAnimationFrame(frame1);
   }, [percent]);
 
-  const radius = 70;
-  const stroke = 12;
+  const radius = 60;
+  const stroke = 10;
   const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const offset = circumference - (displayPercent / 100) * circumference;
@@ -301,9 +301,22 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
   const maxMissing = Math.max(1, ...keyFieldTitles.map(t => missingByField[t]));
   const isBusy = librariesLoading || dataLoading;
 
+  const themeColors = props.theme ? props.theme.semanticColors : undefined;
+  const themePalette = props.theme ? props.theme.palette : undefined;
+
+  const rootStyle: React.CSSProperties = themeColors && themePalette ? ({
+    '--mcd-text': themeColors.bodyText,
+    '--mcd-text-secondary': themeColors.bodySubtext || themeColors.bodyText,
+    '--mcd-bg-surface': themeColors.bodyBackground,
+    '--mcd-bg-hover': themeColors.bodyBackgroundHovered || themeColors.bodyBackground,
+    '--mcd-border': themeColors.bodyDivider || themePalette.neutralLight,
+    '--mcd-accent': themePalette.themePrimary,
+    '--mcd-accent-text': themePalette.white
+  } as React.CSSProperties) : {};
+
   if (librariesLoading) {
     return (
-      <section className={`${styles.metadataCompliance} ${props.isDarkTheme ? styles.dark : ''}`}>
+      <section className={styles.metadataCompliance} style={rootStyle}>
         <div className={styles.loadingState}>
           <div className={styles.spinner} />
           <span>Discovering document libraries...</span>
@@ -314,7 +327,7 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
 
   if (libraries.length === 0 && !error) {
     return (
-      <section className={`${styles.metadataCompliance} ${props.isDarkTheme ? styles.dark : ''}`}>
+      <section className={styles.metadataCompliance} style={rootStyle}>
         <div className={styles.errorState}>
           No document libraries with custom metadata columns were found on this site.
         </div>
@@ -323,7 +336,7 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
   }
 
   return (
-    <section className={`${styles.metadataCompliance} ${props.isDarkTheme ? styles.dark : ''}`}>
+    <section className={styles.metadataCompliance} style={rootStyle}>
       <header className={styles.header}>
         <div>
           <h2 className={styles.title}>Metadata Compliance Dashboard</h2>
