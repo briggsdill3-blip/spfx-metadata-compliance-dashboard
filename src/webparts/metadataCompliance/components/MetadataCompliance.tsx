@@ -6,7 +6,6 @@ import '@pnp/sp/items';
 import '@pnp/sp/fields';
 import styles from './MetadataCompliance.module.scss';
 import type { IMetadataComplianceProps } from './IMetadataComplianceProps';
-import type { SPFI } from '@pnp/sp';
 
 interface ILibraryOption {
   siteUrl: string;
@@ -47,8 +46,6 @@ const SYSTEM_FIELD_BLOCKLIST = new Set([
   'TemplateUrl', 'ParentVersionString', 'ParentLeafName',
   'FileLeafRef', 'Title'
 ]);
-
-const ALL_SITES_KEY = '__all__';
 
 const makeLibraryKey = (siteUrl: string, title: string): string => `${siteUrl}::${title}`;
 
@@ -152,7 +149,7 @@ const getCustomFields = async (
 const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (props) => {
   const [libraries, setLibraries] = useState<ILibraryOption[]>([]);
   const [selectedKey, setSelectedKey] = useState<string>('');
-  const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>(ALL_SITES_KEY);
+  const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>('');
   const [librariesLoading, setLibrariesLoading] = useState<boolean>(true);
   const [fieldsCache, setFieldsCache] = useState<Record<string, IFieldMeta[]>>({});
 
@@ -221,7 +218,10 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
         if (!cancelled) {
           setFieldsCache(cache);
           setLibraries(qualifying);
-          setSelectedKey(qualifying.length > 0 ? makeLibraryKey(qualifying[0].siteUrl, qualifying[0].title) : '');
+          const firstSiteUrl = qualifying.length > 0 ? qualifying[0].siteUrl : '';
+          setSelectedSiteFilter(firstSiteUrl);
+          const firstInSite = qualifying.find((l) => l.siteUrl === firstSiteUrl);
+          setSelectedKey(firstInSite ? makeLibraryKey(firstInSite.siteUrl, firstInSite.title) : '');
         }
       } catch (err) {
         if (!cancelled) {
@@ -347,9 +347,13 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
 
   const uniqueSites = Array.from(new Map(libraries.map(l => [l.siteUrl, l.siteLabel])).entries());
 
-  const librariesForSiteFilter = selectedSiteFilter === ALL_SITES_KEY
-    ? libraries
-    : libraries.filter(l => l.siteUrl === selectedSiteFilter);
+  const librariesForSiteFilter = libraries.filter(l => l.siteUrl === selectedSiteFilter);
+
+  const handleSiteFilterChange = (siteUrl: string): void => {
+    setSelectedSiteFilter(siteUrl);
+    const firstInSite = libraries.find((l) => l.siteUrl === siteUrl);
+    setSelectedKey(firstInSite ? makeLibraryKey(firstInSite.siteUrl, firstInSite.title) : '');
+  };
 
   const themeColors = props.theme ? props.theme.semanticColors : undefined;
   const themePalette = props.theme ? props.theme.palette : undefined;
@@ -409,9 +413,8 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
               id="siteFilter"
               className={styles.select}
               value={selectedSiteFilter}
-              onChange={(e) => setSelectedSiteFilter(e.target.value)}
+              onChange={(e) => handleSiteFilterChange(e.target.value)}
             >
-              <option value={ALL_SITES_KEY}>All Sites</option>
               {uniqueSites.map(([url, label]) => (
                 <option key={url} value={url}>{label}</option>
               ))}
@@ -428,11 +431,8 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
             >
               {librariesForSiteFilter.map(lib => {
                 const key = makeLibraryKey(lib.siteUrl, lib.title);
-                const displayLabel = selectedSiteFilter === ALL_SITES_KEY
-                  ? `${lib.siteLabel}: ${lib.title} (${lib.itemCount})`
-                  : `${lib.title} (${lib.itemCount})`;
                 return (
-                  <option key={key} value={key}>{displayLabel}</option>
+                  <option key={key} value={key}>{lib.title} ({lib.itemCount})</option>
                 );
               })}
             </select>

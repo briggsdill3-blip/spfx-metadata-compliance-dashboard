@@ -32,6 +32,7 @@ const makeKey = (siteUrl: string, title: string): string => `${siteUrl}::${title
 const LibraryExclusionChecklist: React.FunctionComponent<ILibraryExclusionChecklistProps> = (props) => {
   const [groups, setGroups] = useState<ISiteGroup[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set());
   const siteUrlsKey = props.sites.map((s) => s.url).join('|');
 
   useEffect(() => {
@@ -92,6 +93,20 @@ const LibraryExclusionChecklist: React.FunctionComponent<ILibraryExclusionCheckl
     props.onChange(next);
   };
 
+  const toggleSiteExpanded = (siteUrl: string): void => {
+    const next = new Set(expandedSites);
+    if (next.has(siteUrl)) {
+      next.delete(siteUrl);
+    } else {
+      next.add(siteUrl);
+    }
+    setExpandedSites(next);
+  };
+
+  const countIncluded = (group: ISiteGroup): number => {
+    return group.libraries.filter((lib) => props.excludedLibraries.indexOf(makeKey(lib.siteUrl, lib.title)) === -1).length;
+  };
+
   return (
     <div className={styles.checklistWrapper}>
       <div className={styles.fieldLabel}>{props.label}</div>
@@ -102,32 +117,48 @@ const LibraryExclusionChecklist: React.FunctionComponent<ILibraryExclusionCheckl
         <p className={styles.hint}>Loading libraries...</p>
       ) : (
         <div className={styles.groupsScroll}>
-          {groups.map((group) => (
-            <div key={group.siteUrl} className={styles.siteGroup}>
-              <p className={styles.siteGroupTitle}>{group.siteLabel}</p>
-              {group.error ? (
-                <p className={styles.errorText}>{group.error}</p>
-              ) : group.libraries.length === 0 ? (
-                <p className={styles.hint}>No document libraries found on this site.</p>
-              ) : (
-                group.libraries.map((lib) => {
-                  const key = makeKey(lib.siteUrl, lib.title);
-                  const isChecked = props.excludedLibraries.indexOf(key) === -1;
-                  return (
-                    <label key={key} className={styles.checkboxRow}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleLibrary(lib.siteUrl, lib.title)}
-                      />
-                      <span className={styles.checkboxLabel}>{lib.title}</span>
-                      <span className={styles.checkboxCount}>{lib.itemCount}</span>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          ))}
+          {groups.map((group) => {
+            const isExpanded = expandedSites.has(group.siteUrl);
+            return (
+              <div key={group.siteUrl} className={styles.siteGroup}>
+                <button
+                  type="button"
+                  className={styles.siteGroupHeader}
+                  onClick={() => toggleSiteExpanded(group.siteUrl)}
+                >
+                  <span className={styles.expandIcon}>{isExpanded ? '▾' : '▸'}</span>
+                  <span className={styles.siteGroupTitle}>{group.siteLabel}</span>
+                  <span className={styles.siteGroupCount}>{countIncluded(group)}/{group.libraries.length}</span>
+                </button>
+
+                {isExpanded && (
+                  <div className={styles.siteGroupBody}>
+                    {group.error ? (
+                      <p className={styles.errorText}>{group.error}</p>
+                    ) : group.libraries.length === 0 ? (
+                      <p className={styles.hint}>No document libraries found on this site.</p>
+                    ) : (
+                      group.libraries.map((lib) => {
+                        const key = makeKey(lib.siteUrl, lib.title);
+                        const isChecked = props.excludedLibraries.indexOf(key) === -1;
+                        return (
+                          <label key={key} className={styles.checkboxRow}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleLibrary(lib.siteUrl, lib.title)}
+                            />
+                            <span className={styles.checkboxLabel}>{lib.title}</span>
+                            <span className={styles.checkboxCount}>{lib.itemCount}</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
