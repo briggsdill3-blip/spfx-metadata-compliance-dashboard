@@ -1,11 +1,18 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
+import { Web } from '@pnp/sp/webs';
+import '@pnp/sp/lists';
+import '@pnp/sp/items';
+import '@pnp/sp/fields';
 import styles from './MetadataCompliance.module.scss';
 import type { IMetadataComplianceProps } from './IMetadataComplianceProps';
+import type { SPFI } from '@pnp/sp';
 
 interface ILibraryOption {
-  Title: string;
-  ItemCount: number;
+  siteUrl: string;
+  siteLabel: string;
+  title: string;
+  itemCount: number;
 }
 
 interface IFieldMeta {
@@ -40,6 +47,10 @@ const SYSTEM_FIELD_BLOCKLIST = new Set([
   'TemplateUrl', 'ParentVersionString', 'ParentLeafName',
   'FileLeafRef', 'Title'
 ]);
+
+const ALL_SITES_KEY = '__all__';
+
+const makeLibraryKey = (siteUrl: string, title: string): string => `${siteUrl}::${title}`;
 
 const isFieldEmpty = (value: string): boolean => {
   return !value || value.trim() === '';
@@ -115,11 +126,11 @@ const ProgressRing: React.FunctionComponent<IProgressRingProps> = ({ percent, ti
 };
 
 const getCustomFields = async (
-  sp: IMetadataComplianceProps['sp'],
+  web: ReturnType<typeof Web>,
   libraryTitle: string,
   excludedFields: string[]
 ): Promise<IFieldMeta[]> => {
-  const rawFields = await sp.web.lists.getByTitle(libraryTitle).fields
+  const rawFields = await web.lists.getByTitle(libraryTitle).fields
     .select('InternalName', 'Title', 'TypeAsString', 'Hidden', 'ReadOnlyField', 'Group')
     .filter('Hidden eq false and ReadOnlyField eq false')();
 
@@ -140,7 +151,8 @@ const getCustomFields = async (
 
 const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (props) => {
   const [libraries, setLibraries] = useState<ILibraryOption[]>([]);
-  const [selectedLibrary, setSelectedLibrary] = useState<string>('');
+  const [selectedKey, setSelectedKey] = useState<string>('');
+  const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>(ALL_SITES_KEY);
   const [librariesLoading, setLibrariesLoading] = useState<boolean>(true);
   const [fieldsCache, setFieldsCache] = useState<Record<string, IFieldMeta[]>>({});
 
@@ -149,78 +161,101 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
   const [error, setError] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('All');
 
-  const isLocked = props.lockedLibrary.trim().length > 0;
-  const excludedKey = props.excludedFields.join('|');
+  const sitesKey = props.targetSites.map(s => s.url).join('|');
+  const excludedLibrariesKey = props.excludedLibraries.join('|');
+  const excludedFieldsKey = props.excludedFields.join('|');
 
   useEffect(() => {
-    const setupLockedLibrary = async (): Promise<void> => {
+    let cancelled = false;
+
+    const discover = async (): Promise<void> => {
+      setLibrariesLoading(true);
+      setError('');
+
       try {
-        const libTitle = props.lockedLibrary.trim();
-        const rawLib = await props.sp.web.lists.getByTitle(libTitle).select('Title', 'ItemCount')();
-        const customFields = await getCustomFields(props.sp, libTitle, props.excludedFields);
+        const perSite = await Promise.all(
+          props.targetSites.map(async (site) => {
+            try {
+              const web = Web([props.sp.web, site.url]);
+              const rawLibraries = await web.lists
+                .filter('BaseTemplate eq 101 and Hidden eq false')
+                .select('Title', 'ItemCount')();
+              return { site, libraries: rawLibraries as { Title: string; ItemCount: number }[] };
+            } catch (err) {
+              console.error(`Failed to load libraries for ${site.url}`, err);
+              return { site, libraries: [] as { Title: string; ItemCount: number }[] };
+            }
+          })
+        );
 
-        setFieldsCache({ [libTitle]: customFields });
-        setSelectedLibrary(libTitle);
-        setLibraries([{ Title: libTitle, ItemCount: rawLib.ItemCount }]);
-      } catch (err) {
-        setError(`Unable to find or read the configured library "${props.lockedLibrary}".`);
-        console.error(err);
-      } finally {
-        setLibrariesLoading(false);
-      }
-    };
-
-    const discoverLibraries = async (): Promise<void> => {
-      try {
-        const rawLibraries = await props.sp.web.lists
-          .filter('BaseTemplate eq 101 and Hidden eq false')
-          .select('Title', 'ItemCount')();
-
-        const candidateLibraries: ILibraryOption[] = rawLibraries.map((lib: ILibraryOption) => ({
-          Title: lib.Title,
-          ItemCount: lib.ItemCount
-        }));
+        const candidates: ILibraryOption[] = [];
+        perSite.forEach(({ site, libraries: siteLibraries }) => {
+          siteLibraries.forEach((lib) => {
+            const key = makeLibraryKey(site.url, lib.Title);
+            if (props.excludedLibraries.indexOf(key) === -1) {
+              candidates.push({
+                siteUrl: site.url,
+                siteLabel: site.label,
+                title: lib.Title,
+                itemCount: lib.ItemCount
+              });
+            }
+          });
+        });
 
         const fieldResults = await Promise.all(
-          candidateLibraries.map(async lib => ({
-            title: lib.Title,
-            fields: await getCustomFields(props.sp, lib.Title, props.excludedFields)
-          }))
+          candidates.map(async (c) => {
+            const web = Web([props.sp.web, c.siteUrl]);
+            const fields = await getCustomFields(web, c.title, props.excludedFields);
+            return { key: makeLibraryKey(c.siteUrl, c.title), fields };
+          })
         );
 
         const cache: Record<string, IFieldMeta[]> = {};
-        fieldResults.forEach(r => { cache[r.title] = r.fields; });
-        setFieldsCache(cache);
+        fieldResults.forEach((r) => { cache[r.key] = r.fields; });
 
-        const qualifyingLibraries = candidateLibraries
-          .filter(lib => cache[lib.Title] && cache[lib.Title].length > 0)
-          .sort((a, b) => a.Title.localeCompare(b.Title));
+        const qualifying = candidates
+          .filter((c) => cache[makeLibraryKey(c.siteUrl, c.title)] && cache[makeLibraryKey(c.siteUrl, c.title)].length > 0)
+          .sort((a, b) => a.siteLabel.localeCompare(b.siteLabel) || a.title.localeCompare(b.title));
 
-        setLibraries(qualifyingLibraries);
-
-        const defaultLib = qualifyingLibraries.some(l => l.Title === 'Documents')
-          ? 'Documents'
-          : (qualifyingLibraries[0] ? qualifyingLibraries[0].Title : '');
-
-        setSelectedLibrary(defaultLib);
+        if (!cancelled) {
+          setFieldsCache(cache);
+          setLibraries(qualifying);
+          setSelectedKey(qualifying.length > 0 ? makeLibraryKey(qualifying[0].siteUrl, qualifying[0].title) : '');
+        }
       } catch (err) {
-        setError('Unable to load document libraries for this site.');
+        if (!cancelled) {
+          setError('Unable to load document libraries across the configured sites.');
+        }
         console.error(err);
       } finally {
-        setLibrariesLoading(false);
+        if (!cancelled) {
+          setLibrariesLoading(false);
+        }
       }
     };
 
-    setLibrariesLoading(true);
-    if (isLocked) {
-      setupLockedLibrary().catch((err) => console.error(err));
+    if (props.targetSites.length === 0) {
+      setLibraries([]);
+      setSelectedKey('');
+      setLibrariesLoading(false);
     } else {
-      discoverLibraries().catch((err) => console.error(err));
+      discover().catch((err) => console.error(err));
     }
-  }, [props.sp, props.lockedLibrary, excludedKey]);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.sp, sitesKey, excludedLibrariesKey, excludedFieldsKey]);
 
   useEffect(() => {
-    if (!selectedLibrary || !fieldsCache[selectedLibrary]) {
+    if (!selectedKey || !fieldsCache[selectedKey]) {
+      return;
+    }
+
+    const selectedLib = libraries.find((l) => makeLibraryKey(l.siteUrl, l.title) === selectedKey);
+    if (!selectedLib) {
       return;
     }
 
@@ -229,7 +264,8 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
       setError('');
       setSelectedType('All');
 
-      const libraryFields = fieldsCache[selectedLibrary];
+      const libraryFields = fieldsCache[selectedKey];
+      const web = Web([props.sp.web, selectedLib.siteUrl]);
 
       try {
         const selectList = ['Id', 'FileLeafRef', ...libraryFields.map(f =>
@@ -237,7 +273,7 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
         )];
         const expandList = libraryFields.filter(f => f.TypeAsString === 'User').map(f => f.InternalName);
 
-        let query = props.sp.web.lists.getByTitle(selectedLibrary).items
+        let query = web.lists.getByTitle(selectedLib.title).items
           .select(...selectList)
           .top(5000);
 
@@ -271,7 +307,7 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
 
         setItems(mapped);
       } catch (err) {
-        setError(`Unable to load data from "${selectedLibrary}".`);
+        setError(`Unable to load data from "${selectedLib.title}".`);
         console.error(err);
       } finally {
         setDataLoading(false);
@@ -279,9 +315,10 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
     };
 
     loadItems().catch((err) => console.error(err));
-  }, [props.sp, selectedLibrary, fieldsCache]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.sp, selectedKey, fieldsCache]);
 
-  const currentFields = fieldsCache[selectedLibrary] || [];
+  const currentFields = fieldsCache[selectedKey] || [];
   const keyFieldTitles = currentFields.map(f => f.Title);
 
   const typeField = currentFields.find(f => f.Title.toLowerCase().includes('type'));
@@ -308,6 +345,12 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
   const maxMissing = Math.max(1, ...keyFieldTitles.map(t => missingByField[t]));
   const isBusy = librariesLoading || dataLoading;
 
+  const uniqueSites = Array.from(new Map(libraries.map(l => [l.siteUrl, l.siteLabel])).entries());
+
+  const librariesForSiteFilter = selectedSiteFilter === ALL_SITES_KEY
+    ? libraries
+    : libraries.filter(l => l.siteUrl === selectedSiteFilter);
+
   const themeColors = props.theme ? props.theme.semanticColors : undefined;
   const themePalette = props.theme ? props.theme.palette : undefined;
 
@@ -320,6 +363,16 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
     '--mcd-accent': themePalette.themePrimary,
     '--mcd-accent-text': themePalette.white
   } as React.CSSProperties) : {};
+
+  if (props.targetSites.length === 0) {
+    return (
+      <section className={styles.metadataCompliance} style={rootStyle}>
+        <div className={styles.errorState}>
+          This web part needs to be configured. Open the edit panel and add one or more target sites.
+        </div>
+      </section>
+    );
+  }
 
   if (librariesLoading) {
     return (
@@ -336,7 +389,7 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
     return (
       <section className={styles.metadataCompliance} style={rootStyle}>
         <div className={styles.errorState}>
-          No document libraries with custom metadata columns were found on this site.
+          No qualifying document libraries were found across the configured sites.
         </div>
       </section>
     );
@@ -347,26 +400,43 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
       <header className={styles.header}>
         <div>
           <h2 className={styles.title}>Metadata Compliance Dashboard</h2>
-          <p className={styles.subtitle}>Tagging health for this document library</p>
+          <p className={styles.subtitle}>Tagging health across your configured sites</p>
         </div>
         <div className={styles.filterGroup}>
-          {!isLocked && (
-            <div className={styles.filterControl}>
-              <label htmlFor="libraryFilter" className={styles.filterLabel}>Library</label>
-              <select
-                id="libraryFilter"
-                className={styles.select}
-                value={selectedLibrary}
-                onChange={(e) => setSelectedLibrary(e.target.value)}
-              >
-                {libraries.map(lib => (
-                  <option key={lib.Title} value={lib.Title}>
-                    {lib.Title} ({lib.ItemCount})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className={styles.filterControl}>
+            <label htmlFor="siteFilter" className={styles.filterLabel}>Site</label>
+            <select
+              id="siteFilter"
+              className={styles.select}
+              value={selectedSiteFilter}
+              onChange={(e) => setSelectedSiteFilter(e.target.value)}
+            >
+              <option value={ALL_SITES_KEY}>All Sites</option>
+              {uniqueSites.map(([url, label]) => (
+                <option key={url} value={url}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.filterControl}>
+            <label htmlFor="libraryFilter" className={styles.filterLabel}>Library</label>
+            <select
+              id="libraryFilter"
+              className={styles.select}
+              value={selectedKey}
+              onChange={(e) => setSelectedKey(e.target.value)}
+            >
+              {librariesForSiteFilter.map(lib => {
+                const key = makeLibraryKey(lib.siteUrl, lib.title);
+                const displayLabel = selectedSiteFilter === ALL_SITES_KEY
+                  ? `${lib.siteLabel}: ${lib.title} (${lib.itemCount})`
+                  : `${lib.title} (${lib.itemCount})`;
+                return (
+                  <option key={key} value={key}>{displayLabel}</option>
+                );
+              })}
+            </select>
+          </div>
 
           {typeField && (
             <div className={styles.filterControl}>

@@ -3,6 +3,7 @@ import * as ReactDom from 'react-dom';
 import { Version } from '@microsoft/sp-core-library';
 import {
   type IPropertyPaneConfiguration,
+  type IPropertyPaneGroup,
   PropertyPaneTextField
 } from '@microsoft/sp-property-pane';
 import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
@@ -17,9 +18,13 @@ import '@pnp/sp/fields';
 import * as strings from 'MetadataComplianceWebPartStrings';
 import MetadataCompliance from './components/MetadataCompliance';
 import { IMetadataComplianceProps } from './components/IMetadataComplianceProps';
+import { ISiteEntry } from './components/ISiteEntry';
+import { PropertyPaneSiteEntryChipInputField } from './controls/SiteEntryChipInputField';
+import { PropertyPaneLibraryExclusionChecklistField } from './controls/LibraryExclusionChecklistField';
 
 export interface IMetadataComplianceWebPartProps {
-  lockedLibrary: string;
+  targetSites: ISiteEntry[];
+  excludedLibraries: string[];
   goodThreshold: string;
   warnThreshold: string;
   excludedFields: string;
@@ -45,6 +50,8 @@ export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMe
   private _theme: IReadonlyTheme | undefined;
   private _environmentMessage: string = '';
   private _sp!: SPFI;
+  private _targetSitesField: PropertyPaneSiteEntryChipInputField | undefined;
+  private _exclusionChecklistField: PropertyPaneLibraryExclusionChecklistField | undefined;
 
   public render(): void {
     if (!this._sp) {
@@ -58,10 +65,11 @@ export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMe
         environmentMessage: this._environmentMessage,
         userDisplayName: this.context.pageContext.user.displayName,
         sp: this._sp,
-        lockedLibrary: this.properties.lockedLibrary || '',
+        targetSites: this.properties.targetSites || [],
+        excludedLibraries: this.properties.excludedLibraries || [],
+        excludedFields: parseExcludedFields(this.properties.excludedFields),
         goodThreshold: parseThreshold(this.properties.goodThreshold, 90),
-        warnThreshold: parseThreshold(this.properties.warnThreshold, 70),
-        excludedFields: parseExcludedFields(this.properties.excludedFields)
+        warnThreshold: parseThreshold(this.properties.warnThreshold, 70)
       }
     );
 
@@ -70,6 +78,13 @@ export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMe
 
   protected onInit(): Promise<void> {
     this._sp = spfi().using(spSPFx(this.context));
+
+    if (!this.properties.targetSites) {
+      this.properties.targetSites = [];
+    }
+    if (!this.properties.excludedLibraries) {
+      this.properties.excludedLibraries = [];
+    }
 
     return this._getEnvironmentMessage().then(message => {
       this._environmentMessage = message;
@@ -114,49 +129,83 @@ export default class MetadataComplianceWebPart extends BaseClientSideWebPart<IMe
   }
 
   protected get dataVersion(): Version {
-    return Version.parse('2.0');
+    return Version.parse('3.0');
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
+    this._targetSitesField = new PropertyPaneSiteEntryChipInputField('targetSites', {
+      label: 'Target Sites',
+      entries: this.properties.targetSites || [],
+      onPropertyChange: (propertyPath: string, newValue: ISiteEntry[]) => {
+        this.properties.targetSites = newValue;
+        this.render();
+
+        if (this._targetSitesField) {
+          this._targetSitesField.properties.entries = newValue;
+          this._targetSitesField.render();
+        }
+
+        if (this._exclusionChecklistField) {
+          this._exclusionChecklistField.properties.sites = newValue;
+          this._exclusionChecklistField.render();
+        }
+      }
+    });
+
+    this._exclusionChecklistField = new PropertyPaneLibraryExclusionChecklistField('excludedLibraries', {
+      label: 'Included Libraries',
+      sp: this._sp,
+      sites: this.properties.targetSites || [],
+      excludedLibraries: this.properties.excludedLibraries || [],
+      onPropertyChange: (propertyPath: string, newValue: string[]) => {
+        this.properties.excludedLibraries = newValue;
+        this.render();
+
+        if (this._exclusionChecklistField) {
+          this._exclusionChecklistField.properties.excludedLibraries = newValue;
+        }
+      }
+    });
+
+    const groups: IPropertyPaneGroup[] = [
+      {
+        groupName: 'Sites and Libraries',
+        groupFields: [
+          this._targetSitesField,
+          this._exclusionChecklistField
+        ]
+      },
+      {
+        groupName: 'Data Source',
+        groupFields: [
+          PropertyPaneTextField('excludedFields', {
+            label: 'Excluded Fields (comma-separated)',
+            description: 'Metadata columns to ignore when calculating completeness, e.g. Notes, Comments'
+          })
+        ]
+      },
+      {
+        groupName: 'Compliance Thresholds',
+        groupFields: [
+          PropertyPaneTextField('goodThreshold', {
+            label: 'On Target threshold (%)',
+            description: 'Default 90. Percent complete at or above this is shown as green.'
+          }),
+          PropertyPaneTextField('warnThreshold', {
+            label: 'Needs Attention threshold (%)',
+            description: 'Default 70. Percent complete at or above this (but below target) is shown as amber.'
+          })
+        ]
+      }
+    ];
+
     return {
       pages: [
         {
           header: {
             description: strings.PropertyPaneDescription
           },
-          groups: [
-            {
-              groupName: strings.BasicGroupName,
-              groupFields: [
-                PropertyPaneTextField('lockedLibrary', {
-                  label: 'Lock to Library (exact name)',
-                  description: 'Leave blank to let users switch between any qualifying library on this site.'
-                })
-              ]
-            },
-            {
-              groupName: 'Data Source',
-              groupFields: [
-                PropertyPaneTextField('excludedFields', {
-                  label: 'Excluded Fields (comma-separated)',
-                  description: 'Metadata columns to ignore when calculating completeness, e.g. Notes, Comments'
-                })
-              ]
-            },
-            {
-              groupName: 'Compliance Thresholds',
-              groupFields: [
-                PropertyPaneTextField('goodThreshold', {
-                  label: 'On Target threshold (%)',
-                  description: 'Default 90. Percent complete at or above this is shown as green.'
-                }),
-                PropertyPaneTextField('warnThreshold', {
-                  label: 'Needs Attention threshold (%)',
-                  description: 'Default 70. Percent complete at or above this (but below target) is shown as amber.'
-                })
-              ]
-            }
-          ]
+          groups
         }
       ]
     };
