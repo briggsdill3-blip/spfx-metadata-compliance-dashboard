@@ -55,6 +55,11 @@ const getStatusTier = (percent: number, goodThreshold: number, warnThreshold: nu
   return 'bad';
 };
 
+const getTierClassName = (tier: 'good' | 'warn' | 'bad'): string => {
+  const tierKey = `tier-${tier}`;
+  return styles[tierKey];
+};
+
 interface IProgressRingProps {
   percent: number;
   tier: 'good' | 'warn' | 'bad';
@@ -77,6 +82,7 @@ const ProgressRing: React.FunctionComponent<IProgressRingProps> = ({ percent, ti
   const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const offset = circumference - (displayPercent / 100) * circumference;
+  const tierClass = getTierClassName(tier);
 
   return (
     <svg height={radius * 2} width={radius * 2} className={styles.ring}>
@@ -91,7 +97,7 @@ const ProgressRing: React.FunctionComponent<IProgressRingProps> = ({ percent, ti
       />
       <circle
         stroke="currentColor"
-        className={`${styles.ringProgress} ${styles[`tier-${tier}`]}`}
+        className={`${styles.ringProgress} ${tierClass}`}
         fill="transparent"
         strokeWidth={stroke}
         strokeDasharray={`${circumference} ${circumference}`}
@@ -292,6 +298,7 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
   const incompleteCount = totalCount - completeCount;
   const completionPercent = totalCount === 0 ? 0 : Math.round((completeCount / totalCount) * 100);
   const tier = getStatusTier(completionPercent, props.goodThreshold, props.warnThreshold);
+  const tierClass = getTierClassName(tier);
 
   const missingByField = keyFieldTitles.reduce((acc, title) => {
     acc[title] = filteredItems.filter(i => isFieldEmpty(i.values[title])).length;
@@ -396,7 +403,7 @@ const MetadataCompliance: React.FunctionComponent<IMetadataComplianceProps> = (p
           <div className={styles.summaryRow}>
             <div className={styles.ringCard}>
               <ProgressRing percent={completionPercent} tier={tier} />
-              <span className={`${styles.tierBadge} ${styles[`tier-${tier}`]}`}>
+              <span className={`${styles.tierBadge} ${tierClass}`}>
                 {tier === 'good' ? 'On Target' : tier === 'warn' ? 'Needs Attention' : 'At Risk'}
               </span>
             </div>
