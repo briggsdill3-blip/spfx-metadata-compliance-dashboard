@@ -1,40 +1,43 @@
 .checklistWrapper {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin-top: 4px;
+  min-height: 0;
 }
 
 .fieldLabel {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: #F5F5F0;
 }
 
 .groupsScroll {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 360px;
+  gap: 4px;
+  max-height: 260px;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
 
 .siteGroup {
   border: 1px solid #3A3A3A;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
   background-color: #232323;
+  flex-shrink: 0;
 }
 
 .siteGroupHeader {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: none;
   border: none;
-  padding: 12px 14px;
+  padding: 6px 8px;
   cursor: pointer;
   color: #F5F5F0;
   font-family: inherit;
@@ -47,16 +50,16 @@
 }
 
 .expandIcon {
-  font-size: 11px;
+  font-size: 9px;
   color: #BF9B30;
-  width: 12px;
+  width: 10px;
   flex: 0 0 auto;
 }
 
 .siteGroupTitle {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: #F5F5F0;
   white-space: nowrap;
@@ -65,11 +68,11 @@
 }
 
 .siteGroupCount {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   color: #B8B8B0;
   background-color: #3A3A3A;
-  padding: 3px 9px;
+  padding: 2px 7px;
   border-radius: 100px;
   flex: 0 0 auto;
   white-space: nowrap;
@@ -82,10 +85,10 @@
 }
 
 .siteGroupBody {
-  padding: 6px 14px 12px 34px;
+  padding: 4px 8px 6px 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
   border-top: 1px solid #3A3A3A;
   box-sizing: border-box;
 }
@@ -93,15 +96,16 @@
 .checkboxRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 2px;
+  gap: 6px;
+  padding: 3px 2px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .checkboxLabel {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: #F5F5F0;
   white-space: nowrap;
   overflow: hidden;
@@ -109,19 +113,19 @@
 }
 
 .checkboxCount {
-  font-size: 12px;
+  font-size: 10px;
   color: #B8B8B0;
   flex: 0 0 auto;
 }
 
 .hint {
-  font-size: 13px;
+  font-size: 12px;
   color: #B8B8B0;
   margin: 4px 0;
 }
 
 .errorText {
-  font-size: 13px;
+  font-size: 12px;
   color: #C86A6A;
   margin: 4px 0;
 }
