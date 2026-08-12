@@ -119,6 +119,10 @@ const LibraryExclusionChecklist: React.FunctionComponent<ILibraryExclusionCheckl
         <div className={styles.groupsScroll}>
           {groups.map((group) => {
             const isExpanded = expandedSites.has(group.siteUrl);
+            const included = countIncluded(group);
+            const total = group.libraries.length;
+            const hasExclusions = included < total;
+
             return (
               <div key={group.siteUrl} className={styles.siteGroup}>
                 <button
@@ -128,7 +132,9 @@ const LibraryExclusionChecklist: React.FunctionComponent<ILibraryExclusionCheckl
                 >
                   <span className={styles.expandIcon}>{isExpanded ? '▾' : '▸'}</span>
                   <span className={styles.siteGroupTitle}>{group.siteLabel}</span>
-                  <span className={styles.siteGroupCount}>{countIncluded(group)}/{group.libraries.length}</span>
+                  <span className={`${styles.siteGroupCount} ${hasExclusions ? styles.siteGroupCountPartial : ''}`}>
+                    {included}/{total}
+                  </span>
                 </button>
 
                 {isExpanded && (
